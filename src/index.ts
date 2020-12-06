@@ -12,6 +12,10 @@ class Color {
         this.blue = blue;
         this.alpha = alpha;
     }
+
+    times(val: number) {
+        return new Color(this.red * val, this.green * val, this.blue * val, this.alpha);
+    }
 }
 
 class Scene {
@@ -19,6 +23,7 @@ class Scene {
     ctx: CanvasRenderingContext2D;
     imageData: ImageData;
     objects: Object[];
+    light: Vector3;
     cameraPosition: Point3;
     fovAdjustment: number;
     aspectRatio: number;
@@ -29,9 +34,11 @@ class Scene {
         this.imageData = this.ctx.getImageData(0, 0, this.canvas.width, this.canvas.height);
         this.objects = [];
         this.cameraPosition = new Point3(0, 0, 0);
-        this.fovAdjustment = Math.PI / 2; // 90 angles field of view
+        this.fovAdjustment = Math.PI / 3.5; // 90 angles field of view
         this.aspectRatio = this.width() / this.height();
+        this.light = new Vector3(10, 10, -7);
     }
+
 
     addObject(object: Object) {
         this.objects.push(object);
@@ -60,26 +67,36 @@ class Scene {
     }
 
     render() {
-        const background = new Color(200, 80, 60);
+        const background = new Color(135, 206, 235);
         for (let x = 0; x < this.width(); x++) {
             for (let y = 0; y < this.height(); y++) {
                 const ray = this.createRay(x, y);
                 
                 let minDistance = Infinity;
-                let minColor = background;
-
+                let minObject = null;
+                
                 this.objects.forEach(object => {
                     if (x == 799 && y == 599 && object instanceof Plane) {
                         // debugger;
                     }
                     const distance = object.intersectsWith(ray);
                     if (distance != null && distance < minDistance) {
-                        minColor = object.color;
                         minDistance = distance;
+                        minObject = object;
                     }
                 })
-                
-                this.setColor(x, y, minColor);
+
+                if (minObject == null) {
+                    this.setColor(x, y, background);
+                    continue;
+                }
+
+                let intersectionPoint = ray.direction.times(minDistance).plus(ray.origin);
+                const normalObject = minObject.normalAt(intersectionPoint);
+                const cos = normalObject.cos(this.light);
+                const color = minObject.color.times(cos);
+
+                this.setColor(x, y, color);
             }
         }
         this.ctx.putImageData(this.imageData, 0, 0);
@@ -110,8 +127,27 @@ class Vector3 {
         return A * B * cos0;
     }
 
+    cos(otherVector: Vector3) {
+        const A = this.norm();
+        const B = otherVector.norm();
+        const num = this.x * otherVector.x + this.y * otherVector.y + this.z * otherVector.z;
+        return num / (A * B);
+    }
+
     norm() {
         return Math.sqrt(this.x * this.x + this.y * this.y + this.z * this.z);
+    }
+
+    times(distance: number): Vector3 {
+        return new Vector3(this.x * distance, this.y * distance, this.z * distance);
+    }
+
+    plus(point: Point3) {
+        return new Vector3(this.x + point.x, this.y + point.y, this.z + point.z);
+    }
+
+    negate(): Vector3 {
+        return new Vector3(-this.x, -this.y, -this.z);
     }
 }
 
@@ -141,6 +177,10 @@ class Point3 {
     minus(otherPoint: Point3): Vector3 {
         return new Vector3(this.x - otherPoint.x, this.y - otherPoint.y, this.z - otherPoint.z);  
     }
+
+    times(val: number): Point3 {
+        return new Point3(this.x * val, this.y * val, this.z * val);
+    }
 }
 
 const ZeroPoint3 = new Point3(0, 0, 0);
@@ -148,6 +188,7 @@ const ZeroPoint3 = new Point3(0, 0, 0);
 interface Object {
     color: Color;
     intersectsWith(ray: Ray): number | null;
+    normalAt(point: Point3): Vector3;
 }
 
 class Sphere {
@@ -159,6 +200,10 @@ class Sphere {
         this.center = center;
         this.radious = radious;
         this.color = color;
+    }
+
+    normalAt(point: Point3): Vector3 {
+        return this.center.minus(point);
     }
 
     intersectsWith(ray: Ray): number|null {
@@ -200,11 +245,26 @@ class Plane {
         const distance = v.dot(this.normal) / denom;
         return distance > 0 ? distance : null;
     }
+
+    normalAt(point: Point3): Vector3 { 
+        return this.normal;
+    }
+}
+
+class Light {
+    direction: Vector3; 
+    color: Color;
+    intensity: number;
+    constructor(direction: Vector3, color: Color, intensity: number) {
+        this.direction = direction;
+        this.color = color;
+        this.intensity = intensity;
+    }
 }
 
 const scene = new Scene(canvas as HTMLCanvasElement);
-scene.addObject(new Sphere(new Point3(-7, 0, -34), 3, new Color(255, 0, 0)));
-scene.addObject(new Sphere(new Point3(4, 4, -10), 3, new Color(0, 255, 0)));
-scene.addObject(new Sphere(new Point3(-9, -2, -8), 3, new Color(0, 0, 255)));
-scene.addObject(new Plane(new Point3(0, -5, 0), new Vector3(0, 1, 0), new Color(50, 50, 50)));
+scene.addObject(new Sphere(new Point3(3, 5, -20), 3, new Color(255, 0, 0)));
+scene.addObject(new Sphere(new Point3(10, 5, -10), 4, new Color(0, 255, 0)));
+scene.addObject(new Sphere(new Point3(-5, 1, -9), 3, new Color(0, 0, 2550)));
+scene.addObject(new Plane(new Point3(0, -10, 0), new Vector3(0, 1, 0), new Color(80, 80, 80)));
 scene.render();
