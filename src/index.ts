@@ -35,7 +35,7 @@ class Scene {
     ctx: CanvasRenderingContext2D;
     imageData: ImageData;
     objects: Object[];
-    light: Light;
+    lights: Light[];
 
     cameraPosition: Point3;
     fovAdjustment: number;
@@ -49,7 +49,10 @@ class Scene {
         this.cameraPosition = new Point3(0, 0, 0);
         this.fovAdjustment = Math.PI / 3.5; // 90 angles field of view
         this.aspectRatio = this.width() / this.height();
-        this.light = new Light(new Point3(0, 10, 0), new Color(1, 1, 1), 1);
+        this.lights = [
+            new Light(new Point3(0, 10, 0), new Color(1, 1, 1), 0.5),
+            new Light(new Point3(0, 20, 10), new Color(1, 1, 1), 10)
+        ];
     }
 
     addObject(object: Object) {
@@ -105,30 +108,32 @@ class Scene {
                 }
 
                 const intersectionPoint: Point3 = ray.origin.plus(ray.direction.times(minDistance));
-                const fromObjectToLight = Vector3.fromToNormalized(intersectionPoint, this.light.origin);
-                const lightRay = new Ray(intersectionPoint, fromObjectToLight);
-                let objectBlocked = false;
-                for (let obj of this.objects) {
-                    if (obj == minObject) {
-                        continue;
-                    }
-                    if (obj.intersectsWith(lightRay) != null) {
-                        objectBlocked = true;
-                        break;
-                    }
-                } 
+                let color = new Color(0, 0, 0);
 
-                if (objectBlocked) {
-                    this.setColor(x, y, black);
-                } else {
-                    const normalObject: Vector3 = minObject.normalAt(intersectionPoint);
-                    const norm = fromObjectToLight.norm()
-                    const lightPower = Math.min(this.light.intensity / (norm * norm), 1);
-                    const finalColor = minObject.color.times(normalObject.dot(fromObjectToLight)).times(lightPower);
-    
-                    this.setColor(x, y, finalColor);
-                }
+                this.lights.forEach(light => {
+                    const fromObjectToLight = Vector3.fromToNormalized(intersectionPoint, light.origin);
+                    const lightRay = new Ray(intersectionPoint, fromObjectToLight);
+                    let objectBlocked = false;
+                    for (let obj of this.objects) {
+                        if (obj == minObject) {
+                            continue;
+                        }
+                        if (obj.intersectsWith(lightRay) != null) {
+                            objectBlocked = true;
+                            break;
+                        }
+                    } 
 
+                    if (!objectBlocked) {
+                        const normalObject: Vector3 = minObject.normalAt(intersectionPoint);
+                        const norm = fromObjectToLight.norm()
+                        const lightPower = Math.min(light.intensity / (norm * norm), 1);
+                        const thisLightColor = minObject.color.times(normalObject.dot(fromObjectToLight)).times(lightPower);
+                        color = color.plus(thisLightColor);
+                    }
+                });
+
+                this.setColor(x, y, color);
             }
         }
         this.ctx.putImageData(this.imageData, 0, 0);
@@ -157,11 +162,6 @@ class Vector3 {
 
     dot(otherVector: Vector3) {
         return this.x * otherVector.x + this.y * otherVector.y + this.z * otherVector.z;
-        // const A = this.norm();
-        // const B = otherVector.norm();
-        // const num = this.x * otherVector.x + this.y * otherVector.y + this.z * otherVector.z;
-        // const cos0 = num / (A * B);
-        // return A * B * cos0;
     }
 
     cos(otherVector: Vector3) {
@@ -311,9 +311,15 @@ scene.addObject(new Sphere(new Point3(-5, 1, -9), 3, new Color(0, 0, 1)));
 scene.addObject(new Plane(new Point3(0, -10, 0), new Vector3(0, 1, 0), new Color(0.8, 0.8, 0.8)));
 
 function move(t) {
-    scene.light.origin.x = Math.sin(t / 10) * 10 + 10;
+    scene.lights[0].origin.x = Math.sin(t / 10) * 10 + 10;
     scene.cameraPosition.x = Math.sin(t / 30) * 5;
+
+    const start = new Date().getTime();
     scene.render();
+    const elapsed = new Date().getTime() - start;
+    if (t % 10 == 0) {
+        console.log("Elapsed: " + elapsed);
+    }
 }
 
 let t = 0;
