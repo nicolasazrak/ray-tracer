@@ -6,15 +6,27 @@ class Color {
     blue: number;
     alpha: number;
 
-    constructor(red: number, green: number, blue: number, alpha = 255) {
-        this.red = red;
-        this.green = green;
-        this.blue = blue;
-        this.alpha = alpha;
+    constructor(red: number, green: number, blue: number, alpha = 1) {
+        this.red = Math.max(Math.min(red, 1), 0);
+        this.green = Math.max(Math.min(green, 1), 0);
+        this.blue = Math.max(Math.min(blue, 1), 0);
+        this.alpha = Math.max(Math.min(alpha, 1), 0);
     }
 
     times(val: number) {
         return new Color(this.red * val, this.green * val, this.blue * val, this.alpha);
+    }
+
+    timesColor(otherColor: Color) {
+        const red = this.red * otherColor.red;
+        const green = this.green * otherColor.green;
+        const blue = this.blue * otherColor.blue;
+        const alpha = this.alpha * otherColor.alpha;
+        return new Color(red, green, blue, alpha);
+    }
+
+    plus(otherColor: Color): Color {
+        return new Color(this.red + otherColor.red, this.green + otherColor.green, this.blue + otherColor.blue, this.alpha + otherColor.alpha);
     }
 }
 
@@ -23,7 +35,8 @@ class Scene {
     ctx: CanvasRenderingContext2D;
     imageData: ImageData;
     objects: Object[];
-    light: Vector3;
+    light: Light;
+
     cameraPosition: Point3;
     fovAdjustment: number;
     aspectRatio: number;
@@ -36,9 +49,8 @@ class Scene {
         this.cameraPosition = new Point3(0, 0, 0);
         this.fovAdjustment = Math.PI / 3.5; // 90 angles field of view
         this.aspectRatio = this.width() / this.height();
-        this.light = new Vector3(10, 10, -7);
+        this.light = new Light(new Point3(-10, 10, 10), new Color(1, 1, 1), 700);
     }
-
 
     addObject(object: Object) {
         this.objects.push(object);
@@ -54,10 +66,10 @@ class Scene {
 
     setColor(x: number, y: number, color: Color) {
         const index = (y * this.width() + x) * 4;
-        this.imageData.data[index] = color.red;
-        this.imageData.data[index + 1] = color.green;
-        this.imageData.data[index + 2] = color.blue;
-        this.imageData.data[index + 3] = color.alpha;
+        this.imageData.data[index] = color.red * 255;
+        this.imageData.data[index + 1] = color.green * 255;
+        this.imageData.data[index + 2] = color.blue * 255;
+        this.imageData.data[index + 3] = color.alpha * 255;
     }
 
     createRay(x: number, y: number) {
@@ -67,7 +79,7 @@ class Scene {
     }
 
     render() {
-        const background = new Color(135, 206, 235);
+        const background = new Color(135/255, 206/255, 235/255);
         for (let x = 0; x < this.width(); x++) {
             for (let y = 0; y < this.height(); y++) {
                 const ray = this.createRay(x, y);
@@ -91,12 +103,18 @@ class Scene {
                     continue;
                 }
 
-                let intersectionPoint = ray.direction.times(minDistance).plus(ray.origin);
-                const normalObject = minObject.normalAt(intersectionPoint);
-                const cos = normalObject.cos(this.light);
-                const color = minObject.color.times(cos);
+                if (x == 799 && y == 599) {
+                    // debugger;
+                }
 
-                this.setColor(x, y, color);
+                const intersectionPoint: Point3 = ray.origin.plus(ray.direction.times(minDistance));
+                const normalObject: Vector3 = minObject.normalAt(intersectionPoint);
+                const lightDirection: Vector3 = intersectionPoint.minus(this.light.origin);
+                const norm = lightDirection.norm()
+                const lightPower = this.light.intensity / (norm * norm);
+                const finalColor = minObject.color.times(normalObject.cos(lightDirection)).times(lightPower);
+
+                this.setColor(x, y, finalColor);
             }
         }
         this.ctx.putImageData(this.imageData, 0, 0);
@@ -142,10 +160,6 @@ class Vector3 {
         return new Vector3(this.x * distance, this.y * distance, this.z * distance);
     }
 
-    plus(point: Point3) {
-        return new Vector3(this.x + point.x, this.y + point.y, this.z + point.z);
-    }
-
     negate(): Vector3 {
         return new Vector3(-this.x, -this.y, -this.z);
     }
@@ -180,6 +194,10 @@ class Point3 {
 
     times(val: number): Point3 {
         return new Point3(this.x * val, this.y * val, this.z * val);
+    }
+
+    plus(vec: Vector3): Point3 {
+        return new Point3(this.x + vec.x, this.y + vec.y, this.z + vec.z);
     }
 }
 
@@ -252,19 +270,29 @@ class Plane {
 }
 
 class Light {
-    direction: Vector3; 
+    origin: Point3; 
     color: Color;
     intensity: number;
-    constructor(direction: Vector3, color: Color, intensity: number) {
-        this.direction = direction;
+    constructor(origin: Point3, color: Color, intensity: number) {
+        this.origin = origin;
         this.color = color;
         this.intensity = intensity;
     }
 }
 
 const scene = new Scene(canvas as HTMLCanvasElement);
-scene.addObject(new Sphere(new Point3(3, 5, -20), 3, new Color(255, 0, 0)));
-scene.addObject(new Sphere(new Point3(10, 5, -10), 4, new Color(0, 255, 0)));
-scene.addObject(new Sphere(new Point3(-5, 1, -9), 3, new Color(0, 0, 2550)));
-scene.addObject(new Plane(new Point3(0, -10, 0), new Vector3(0, 1, 0), new Color(80, 80, 80)));
-scene.render();
+scene.addObject(new Sphere(new Point3(3, 5, -20), 3, new Color(1, 0, 0)));
+scene.addObject(new Sphere(new Point3(10, 5, -10), 4, new Color(0, 1, 0)));
+scene.addObject(new Sphere(new Point3(-5, 1, -9), 3, new Color(0, 0, 1)));
+scene.addObject(new Plane(new Point3(0, -10, 0), new Vector3(0, -1, 0), new Color(0.8, 0.8, 0.8)));
+
+function move(t) {
+    scene.render();
+}
+
+let t = 0;
+setInterval(() => {
+    t++;
+    move(t);
+}, 32);
+move(0);
