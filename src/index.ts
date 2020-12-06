@@ -49,7 +49,7 @@ class Scene {
         this.cameraPosition = new Point3(0, 0, 0);
         this.fovAdjustment = Math.PI / 3.5; // 90 angles field of view
         this.aspectRatio = this.width() / this.height();
-        this.light = new Light(new Point3(-10, 10, 10), new Color(1, 1, 1), 700);
+        this.light = new Light(new Point3(0, 10, 0), new Color(1, 1, 1), 1);
     }
 
     addObject(object: Object) {
@@ -79,7 +79,8 @@ class Scene {
     }
 
     render() {
-        const background = new Color(135/255, 206/255, 235/255);
+        const background = new Color(135 / 255, 206 / 255, 235 / 255);
+        const black = new Color(0,0,0);
         for (let x = 0; x < this.width(); x++) {
             for (let y = 0; y < this.height(); y++) {
                 const ray = this.createRay(x, y);
@@ -88,7 +89,7 @@ class Scene {
                 let minObject = null;
                 
                 this.objects.forEach(object => {
-                    if (x == 799 && y == 599 && object instanceof Plane) {
+                    if (x == 400 && y == 599 && object instanceof Plane) {
                         // debugger;
                     }
                     const distance = object.intersectsWith(ray);
@@ -103,18 +104,31 @@ class Scene {
                     continue;
                 }
 
-                if (x == 799 && y == 599) {
-                    // debugger;
+                const intersectionPoint: Point3 = ray.origin.plus(ray.direction.times(minDistance));
+                const fromObjectToLight = Vector3.fromToNormalized(intersectionPoint, this.light.origin);
+                const lightRay = new Ray(intersectionPoint, fromObjectToLight);
+                let objectBlocked = false;
+                for (let obj of this.objects) {
+                    if (obj == minObject) {
+                        continue;
+                    }
+                    if (obj.intersectsWith(lightRay) != null) {
+                        objectBlocked = true;
+                        break;
+                    }
+                } 
+
+                if (objectBlocked) {
+                    this.setColor(x, y, black);
+                } else {
+                    const normalObject: Vector3 = minObject.normalAt(intersectionPoint);
+                    const norm = fromObjectToLight.norm()
+                    const lightPower = Math.min(this.light.intensity / (norm * norm), 1);
+                    const finalColor = minObject.color.times(normalObject.dot(fromObjectToLight)).times(lightPower);
+    
+                    this.setColor(x, y, finalColor);
                 }
 
-                const intersectionPoint: Point3 = ray.origin.plus(ray.direction.times(minDistance));
-                const normalObject: Vector3 = minObject.normalAt(intersectionPoint);
-                const lightDirection: Vector3 = intersectionPoint.minus(this.light.origin);
-                const norm = lightDirection.norm()
-                const lightPower = this.light.intensity / (norm * norm);
-                const finalColor = minObject.color.times(normalObject.cos(lightDirection)).times(lightPower);
-
-                this.setColor(x, y, finalColor);
             }
         }
         this.ctx.putImageData(this.imageData, 0, 0);
@@ -137,12 +151,17 @@ class Vector3 {
         return new Vector3(x / norm, y / norm, z / norm);
     }
 
+    static fromToNormalized(from: Point3, to: Point3): Vector3 {
+        return to.minus(from).normalize();
+    }
+
     dot(otherVector: Vector3) {
-        const A = this.norm();
-        const B = otherVector.norm();
-        const num = this.x * otherVector.x + this.y * otherVector.y + this.z * otherVector.z;
-        const cos0 = num / (A * B);
-        return A * B * cos0;
+        return this.x * otherVector.x + this.y * otherVector.y + this.z * otherVector.z;
+        // const A = this.norm();
+        // const B = otherVector.norm();
+        // const num = this.x * otherVector.x + this.y * otherVector.y + this.z * otherVector.z;
+        // const cos0 = num / (A * B);
+        // return A * B * cos0;
     }
 
     cos(otherVector: Vector3) {
@@ -162,6 +181,11 @@ class Vector3 {
 
     negate(): Vector3 {
         return new Vector3(-this.x, -this.y, -this.z);
+    }
+
+    normalize(): Vector3 {
+        const n = this.norm()
+        return new Vector3(this.x / n, this.y / n, this.z / n);
     }
 }
 
@@ -221,7 +245,7 @@ class Sphere {
     }
 
     normalAt(point: Point3): Vector3 {
-        return this.center.minus(point);
+        return Vector3.fromToNormalized(this.center, point);
     }
 
     intersectsWith(ray: Ray): number|null {
@@ -249,7 +273,7 @@ class Plane {
     origin: Point3;
     constructor(origin: Point3, normal: Vector3, color: Color) {
         this.origin = origin;
-        this.normal = normal;
+        this.normal = normal.normalize();
         this.color = color;
     }
 
@@ -284,9 +308,11 @@ const scene = new Scene(canvas as HTMLCanvasElement);
 scene.addObject(new Sphere(new Point3(3, 5, -20), 3, new Color(1, 0, 0)));
 scene.addObject(new Sphere(new Point3(10, 5, -10), 4, new Color(0, 1, 0)));
 scene.addObject(new Sphere(new Point3(-5, 1, -9), 3, new Color(0, 0, 1)));
-scene.addObject(new Plane(new Point3(0, -10, 0), new Vector3(0, -1, 0), new Color(0.8, 0.8, 0.8)));
+scene.addObject(new Plane(new Point3(0, -10, 0), new Vector3(0, 1, 0), new Color(0.8, 0.8, 0.8)));
 
 function move(t) {
+    scene.light.origin.x = Math.sin(t / 10) * 10 + 10;
+    scene.cameraPosition.x = Math.sin(t / 30) * 5;
     scene.render();
 }
 
