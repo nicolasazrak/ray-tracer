@@ -13,20 +13,20 @@ class Color {
         this.alpha = Math.max(Math.min(alpha, 1), 0);
     }
 
-    times(val: number) {
-        return new Color(this.red * val, this.green * val, this.blue * val, this.alpha);
+    scale(val: number) {
+        this.red *= val;
+        this.green *= val;
+        this.blue *= val;
     }
 
-    timesColor(otherColor: Color) {
-        const red = this.red * otherColor.red;
-        const green = this.green * otherColor.green;
-        const blue = this.blue * otherColor.blue;
-        const alpha = this.alpha * otherColor.alpha;
-        return new Color(red, green, blue, alpha);
+    add(otherColor: Color) {
+        this.red += otherColor.red;
+        this.green += otherColor.green;
+        this.blue += otherColor.blue;
     }
 
-    plus(otherColor: Color): Color {
-        return new Color(this.red + otherColor.red, this.green + otherColor.green, this.blue + otherColor.blue, this.alpha + otherColor.alpha);
+    clone(): Color {
+        return new Color(this.red, this.green, this.blue, this.alpha);
     }
 }
 
@@ -36,7 +36,8 @@ class Scene {
     imageData: ImageData;
     objects: Object[];
     lights: Light[];
-
+    height: number;
+    width: number;
     cameraPosition: Point3;
     fovAdjustment: number;
     aspectRatio: number;
@@ -47,11 +48,13 @@ class Scene {
         this.imageData = this.ctx.getImageData(0, 0, this.canvas.width, this.canvas.height);
         this.objects = [];
         this.cameraPosition = new Point3(0, 0, 0);
-        this.fovAdjustment = Math.PI / 3.5; // 90 angles field of view
-        this.aspectRatio = this.width() / this.height();
+        this.height = canvas.height;
+        this.width = canvas.width;
+        this.fovAdjustment = Math.PI / 3; // 90 angles field of view
+        this.aspectRatio = this.width / this.height;
         this.lights = [
-            new Light(new Point3(0, 10, 0), new Color(1, 1, 1), 0.5),
-            new Light(new Point3(0, 20, 10), new Color(1, 1, 1), 10)
+            new Light(new Point3(0, 10, 10), new Color(1, 1, 1), 4000),
+            new Light(new Point3(0, 20, 10), new Color(1, 1, 1), 8000)
         ];
     }
 
@@ -59,16 +62,8 @@ class Scene {
         this.objects.push(object);
     }
 
-    width(): number {
-        return this.canvas.width;
-    }
-
-    height(): number {
-        return this.canvas.height;
-    }
-
     setColor(x: number, y: number, color: Color) {
-        const index = (y * this.width() + x) * 4;
+        const index = (y * this.width + x) * 4;
         this.imageData.data[index] = color.red * 255;
         this.imageData.data[index + 1] = color.green * 255;
         this.imageData.data[index + 2] = color.blue * 255;
@@ -76,25 +71,24 @@ class Scene {
     }
 
     createRay(x: number, y: number) {
-        const sensorX = (((x + 0.5) / this.width()) * 2 - 1) * this.aspectRatio * this.fovAdjustment; 
-        const sensorY = 1 - ((y + 0.5) / this.height()) * 2.0 * this.fovAdjustment;
+        const sensorX = (((x + 0.5) / this.width) * 2 - 1) * this.aspectRatio * this.fovAdjustment; 
+        const sensorY = 1 - ((y + 0.5) / this.height) * 2.0 * this.fovAdjustment;
         return new Ray(this.cameraPosition, Vector3.normalized(sensorX, sensorY, -1));
     }
 
     render() {
         const background = new Color(135 / 255, 206 / 255, 235 / 255);
-        const black = new Color(0,0,0);
-        for (let x = 0; x < this.width(); x++) {
-            for (let y = 0; y < this.height(); y++) {
+        const width = this.width;
+        const height = this.height;
+        const intensityDenom = 4 * Math.PI;
+        for (let x = 0; x < width; x++) {
+            for (let y = 0; y < height; y++) {
                 const ray = this.createRay(x, y);
                 
                 let minDistance = Infinity;
-                let minObject = null;
+                let minObject: Object | null = null;
                 
                 this.objects.forEach(object => {
-                    if (x == 400 && y == 599 && object instanceof Plane) {
-                        // debugger;
-                    }
                     const distance = object.intersectsWith(ray);
                     if (distance != null && distance < minDistance) {
                         minDistance = distance;
@@ -107,7 +101,7 @@ class Scene {
                     continue;
                 }
 
-                const intersectionPoint: Point3 = ray.origin.plus(ray.direction.times(minDistance));
+                const intersectionPoint: Point3 = Ray.finalPoint(ray.origin, ray.direction, minDistance);
                 let color = new Color(0, 0, 0);
 
                 this.lights.forEach(light => {
@@ -118,6 +112,7 @@ class Scene {
                         if (obj == minObject) {
                             continue;
                         }
+                        // TODO check distance is less that light
                         if (obj.intersectsWith(lightRay) != null) {
                             objectBlocked = true;
                             break;
@@ -126,10 +121,16 @@ class Scene {
 
                     if (!objectBlocked) {
                         const normalObject: Vector3 = minObject.normalAt(intersectionPoint);
-                        const norm = fromObjectToLight.norm()
-                        const lightPower = Math.min(light.intensity / (norm * norm), 1);
-                        const thisLightColor = minObject.color.times(normalObject.dot(fromObjectToLight)).times(lightPower);
-                        color = color.plus(thisLightColor);
+                        const d = (light.origin.x - intersectionPoint.x) * (light.origin.x - intersectionPoint.x) +
+                            (light.origin.y - intersectionPoint.y) * (light.origin.y - intersectionPoint.y) +
+                            (light.origin.z - intersectionPoint.z) * (light.origin.z - intersectionPoint.z);
+                        
+                        const lightPower = light.intensity / (intensityDenom * d);
+
+                        let thisLightColor = minObject.color.clone();
+                        thisLightColor.scale(normalObject.dot(fromObjectToLight));
+                        thisLightColor.scale(lightPower);
+                        color.add(thisLightColor);
                     }
                 });
 
@@ -157,26 +158,18 @@ class Vector3 {
     }
 
     static fromToNormalized(from: Point3, to: Point3): Vector3 {
-        return to.minus(from).normalize();
+        const x = to.x - from.x;
+        const y = to.y - from.y;
+        const z = to.z - from.z;
+        return Vector3.normalized(x, y, z);
     }
 
     dot(otherVector: Vector3) {
         return this.x * otherVector.x + this.y * otherVector.y + this.z * otherVector.z;
     }
 
-    cos(otherVector: Vector3) {
-        const A = this.norm();
-        const B = otherVector.norm();
-        const num = this.x * otherVector.x + this.y * otherVector.y + this.z * otherVector.z;
-        return num / (A * B);
-    }
-
     norm() {
         return Math.sqrt(this.x * this.x + this.y * this.y + this.z * this.z);
-    }
-
-    times(distance: number): Vector3 {
-        return new Vector3(this.x * distance, this.y * distance, this.z * distance);
     }
 
     negate(): Vector3 {
@@ -196,6 +189,13 @@ class Ray {
         this.origin = origin;
         this.direction = direction;
     }
+
+    static finalPoint(origin: Point3, direction: Vector3, distance: number): Point3 {
+        const x = origin.x + direction.x * distance;
+        const y = origin.y + direction.y * distance;
+        const z = origin.z + direction.z * distance;
+        return new Point3(x, y, z);
+    }
 }
 
 class Point3 {
@@ -209,19 +209,8 @@ class Point3 {
         this.z = z;
     }
 
-    /**
-     * Returns a normalized vector with the direction from this point to otherPoint
-     */
     minus(otherPoint: Point3): Vector3 {
         return new Vector3(this.x - otherPoint.x, this.y - otherPoint.y, this.z - otherPoint.z);  
-    }
-
-    times(val: number): Point3 {
-        return new Point3(this.x * val, this.y * val, this.z * val);
-    }
-
-    plus(vec: Vector3): Point3 {
-        return new Point3(this.x + vec.x, this.y + vec.y, this.z + vec.z);
     }
 }
 
