@@ -14,17 +14,19 @@ export class Scene {
     cameraPosition: Point3;
     fovAdjustment: number;
     aspectRatio: number;
+    samplesPerPixel: number; 
 
     constructor(canvas: HTMLCanvasElement) {
         this.canvas = canvas;
         this.ctx = canvas.getContext("2d");
         this.imageData = this.ctx.getImageData(0, 0, this.canvas.width, this.canvas.height);
         this.objects = [];
-        this.cameraPosition = new Point3(0, 0, 0);
+        this.cameraPosition = new Point3(0, 2, 5);
         this.height = canvas.height;
         this.width = canvas.width;
-        this.fovAdjustment = Math.PI / 2; // 90 angles field of view
+        this.fovAdjustment = Math.PI / 3.2; // 90 angles field of view
         this.aspectRatio = this.width / this.height;
+        this.samplesPerPixel = 50;
         this.lights = [
             new Light(new Point3(0, 10, 10), new Color(1, 1, 1), 4000),
             new Light(new Point3(0, 20, 10), new Color(1, 1, 1), 8000)
@@ -35,11 +37,20 @@ export class Scene {
         this.objects.push(object);
     }
 
-    setColor(x: number, y: number, color: Color) {
+    setColor(x: number, y: number, colors: Color[]) {
         const index = (y * this.width + x) * 4;
-        this.imageData.data[index] = color.red * 255;
-        this.imageData.data[index + 1] = color.green * 255;
-        this.imageData.data[index + 2] = color.blue * 255;
+        let red = 0;
+        let green = 0;
+        let blue = 0;
+
+        for (const color of colors) {
+            red += color.red;
+            green += color.green;
+            blue += color.blue;
+        }
+        this.imageData.data[index] = Math.sqrt(red / colors.length) * 255;
+        this.imageData.data[index + 1] = Math.sqrt(green / colors.length) * 255;
+        this.imageData.data[index + 2] = Math.sqrt(blue / colors.length) * 255;
         this.imageData.data[index + 3] = 255;
     }
 
@@ -86,56 +97,20 @@ export class Scene {
     render() {
         const width = this.width;
         const height = this.height;
+        const samplesPerPixel = this.samplesPerPixel;
         for (let x = 0; x < width; x++) {
             for (let y = 0; y < height; y++) {
                 const ray = this.createRay(x, y);
-                const color = this.colorOf(ray, 0.001, 10);
-                this.setColor(x, y, color);
+                const samples = [];
+                for (let i = 0; i < samplesPerPixel; i++) {
+                    samples.push(this.colorOf(ray, 0.001, 3));
+                }
+                this.setColor(x, y, samples);
             }
         }
         this.ctx.putImageData(this.imageData, 0, 0);
     }
 }
-
-
-/**
- 
- 
- 
-                let minDistance = Infinity;
-                let minObject: Object | null = null;
-                
-                this.objects.forEach(object => {
-                    const distance = object.intersectsWith(ray);
-                    if (distance != null && distance < minDistance) {
-                        minDistance = distance;
-                        minObject = object;
-                    }
-                })
-
-                if (minObject == null) {
-                    this.setColor(x, y, background);
-                    continue;
-                }
-
-                const intersectionPoint: Point3 = Ray.finalPoint(ray.origin, ray.direction, minDistance);
-                let color = new Color(0, 0, 0);
-
-                this.lights.forEach(light => {
-                    const fromObjectToLight = Vector3.fromToNormalized(intersectionPoint, light.origin);
-                    const normalObject = minObject.normalAt(intersectionPoint);
-                    const d = Point3.squaredDistance(light.origin, intersectionPoint);
-                    
-                    const lightPower = light.intensity / (intensityDenom * d);
-
-                    let thisLightColor = minObject.color.clone();
-                    thisLightColor.scale(normalObject.dot(fromObjectToLight));
-                    thisLightColor.scale(lightPower);
-                    color.add(thisLightColor);
-                });
-
- 
- */
 
 export class Light {
     origin: Point3; 
