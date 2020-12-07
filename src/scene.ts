@@ -8,7 +8,6 @@ export class Scene {
     ctx: CanvasRenderingContext2D;
     imageData: ImageData;
     objects: Object[];
-    lights: Light[];
     height: number;
     width: number;
     cameraPosition: Point3;
@@ -24,13 +23,9 @@ export class Scene {
         this.cameraPosition = new Point3(0, 1, 10);
         this.height = canvas.height;
         this.width = canvas.width;
-        this.fovAdjustment = Math.PI / 4; // 90 angles field of view
+        this.fovAdjustment = Math.PI / 3.2; // 90 angles field of view
         this.aspectRatio = this.width / this.height;
-        this.samplesPerPixel = 30;
-        this.lights = [
-            new Light(new Point3(0, 10, 10), new Color(1, 1, 1), 4000),
-            new Light(new Point3(0, 20, 10), new Color(1, 1, 1), 8000)
-        ];
+        this.samplesPerPixel = 50;
     }
 
     addObject(object: Object) {
@@ -109,16 +104,5 @@ export class Scene {
             }
         }
         this.ctx.putImageData(this.imageData, 0, 0);
-    }
-}
-
-export class Light {
-    origin: Point3; 
-    color: Color;
-    intensity: number;
-    constructor(origin: Point3, color: Color, intensity: number) {
-        this.origin = origin;
-        this.color = color;
-        this.intensity = intensity;
     }
 }

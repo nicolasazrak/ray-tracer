@@ -43,3 +43,17 @@ export class Metal {
         return scattered.direction.dot(hit.normal) > 0;
     }
 }
+
+
+export class Light {
+    color: Color;
+
+    constructor(color: Color) {
+        this.color = color;
+    }
+
+    scatter(ray: Ray, hit: Hit, attenuation: Color, scattered: Ray): boolean {
+        attenuation.set(this.color);
+        return false;
+    }
+}

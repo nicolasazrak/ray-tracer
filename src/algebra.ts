@@ -59,6 +59,13 @@ export class Vector3 {
         return this.x * otherVector.x + this.y * otherVector.y + this.z * otherVector.z;
     }
 
+    cross(otherVector: Vector3): Vector3 {
+        const cx = this.y * otherVector.z - this.z * otherVector.y;
+        const cy = this.z * otherVector.x - this.x * otherVector.z;
+        const cz = this.x * otherVector.y - this.y * otherVector.x;
+        return new Vector3(cx, cy, cz);
+    }
+
     norm() {
         return Math.sqrt(this.x * this.x + this.y * this.y + this.z * this.z);
     }
