@@ -15,14 +15,9 @@ export class Lamberian {
     }
 
     scatter(ray: Ray, hit: Hit, attenuation: Color, scattered: Ray): boolean {
-        // const colorScale = hit.normal.dot(ray.direction) * 20;
-        const thisColor = this.color.clone();
-        // thisColor.scale(colorScale);
-        
-        attenuation.set(thisColor);
+        attenuation.set(this.color);
         scattered.origin = hit.point;
         scattered.direction = Vector3.randomAlterate(hit.normal); 
-        
         return true;
     }
 }
