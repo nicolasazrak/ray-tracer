@@ -1,4 +1,4 @@
-const canvas = document.getElementById("canvas");
+const canvas = document.getElementById("canvas") as HTMLCanvasElement;
 
 class Color {
     red: number;
@@ -293,7 +293,7 @@ class Light {
     }
 }
 
-const scene = new Scene(canvas as HTMLCanvasElement);
+const scene = new Scene(canvas);
 scene.addObject(new Sphere(new Point3(3, 5, -20), 3, new Color(1, 0, 0)));
 scene.addObject(new Sphere(new Point3(10, 5, -10), 4, new Color(0, 1, 0)));
 scene.addObject(new Sphere(new Point3(-5, 1, -9), 3, new Color(0, 0, 1)));
@@ -315,5 +315,13 @@ let t = 0;
 setInterval(() => {
     t++;
     move(t);
-}, 32);
+}, 50000);
 move(0);
+
+ // resize the canvas to fill browser window dynamically
+ window.addEventListener('resize', resizeCanvas, false);
+function resizeCanvas() {
+    canvas.style.width = window.innerWidth.toString();
+    canvas.style.height = window.innerHeight.toString();
+ }
+ resizeCanvas();
