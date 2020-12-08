@@ -5,9 +5,9 @@ export class Color {
     blue: number;
 
     constructor(red: number, green: number, blue: number) {
-        this.red = Math.max(Math.min(red, 1), 0);
-        this.green = Math.max(Math.min(green, 1), 0);
-        this.blue = Math.max(Math.min(blue, 1), 0);
+        this.red = red;
+        this.green = green;
+        this.blue = blue;
     }
 
     scale(val: number) {

@@ -23,7 +23,7 @@ export class Scene {
         this.cameraPosition = new Point3(0, 1, 10);
         this.height = canvas.height;
         this.width = canvas.width;
-        this.fovAdjustment = Math.PI / 3.2; // 90 angles field of view
+        this.fovAdjustment = Math.PI / 4; // 90 angles field of view
         this.aspectRatio = this.width / this.height;
         this.samplesPerPixel = 50;
     }
@@ -43,9 +43,9 @@ export class Scene {
             green += color.green;
             blue += color.blue;
         }
-        this.imageData.data[index] = Math.sqrt(red / colors.length) * 255;
-        this.imageData.data[index + 1] = Math.sqrt(green / colors.length) * 255;
-        this.imageData.data[index + 2] = Math.sqrt(blue / colors.length) * 255;
+        this.imageData.data[index] = Math.max(0, Math.min(Math.sqrt(red / colors.length) * 255, 255));
+        this.imageData.data[index + 1] = Math.max(0, Math.min(Math.sqrt(green / colors.length) * 255, 255));
+        this.imageData.data[index + 2] = Math.max(0, Math.min(Math.sqrt(blue / colors.length) * 255, 255));
         this.imageData.data[index + 3] = 255;
     }
 
@@ -72,21 +72,22 @@ export class Scene {
         }
 
         const hit = new Hit();
-        if (this.hit(ray, minDistance, hit)) {
-            const color = new Color(0, 0, 0);
-            const nextRay = new Ray(new Point3(0, 0, 0), new Vector3(0, 0, 0)); // TODO avoid allocating point3 and vector3
-
-            if (hit.material.scatter(ray, hit, color, nextRay)) {
-                const nextColor = this.colorOf(nextRay, minDistance, depth - 1);
-                color.times(nextColor);
-            }
-
-            return color;
+        if (!this.hit(ray, minDistance, hit)) {
+            const direction = ray.direction;
+            const t = 0.5 * (direction.y + 1);
+            return new Color(0.9, 0.9, 0.9);
         }
 
-        const direction = ray.direction;
-        const t = 0.5 * (direction.y + 1);
-        return new Color((1 - t) + t * 0.5, (1 - t) + t * 0.7, (1-t) + 1);
+        const color = new Color(0, 0, 0);
+        let nextRay = new Ray(new Point3(0, 0, 0), new Vector3(0, 0, 0)); // TODO avoid allocating point3 and vector3
+        if (hit.material.scatter(ray, hit, color, nextRay)) {
+            const nextColor = this.colorOf(nextRay, minDistance, depth - 1);
+            nextColor.scale(hit.material.reflected());
+            color.times(nextColor);
+            color.add(hit.material.emmited());
+        }
+
+        return color;
     }
 
     render() {
@@ -98,7 +99,7 @@ export class Scene {
                 const ray = this.createRay(x, y);
                 const samples = [];
                 for (let i = 0; i < samplesPerPixel; i++) {
-                    samples.push(this.colorOf(ray, 0.001, 3));
+                    samples.push(this.colorOf(ray, 0.001, 5));
                 }
                 this.setColor(x, y, samples);
             }

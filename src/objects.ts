@@ -157,3 +157,118 @@ export class Rectangle {
         return false;
     }
 }
+
+export class XYRectangle {
+    x0: number;
+    x1: number;
+    y0: number;
+    y1: number;
+    z: number;
+    material: Material;
+
+    constructor(x0: number, x1: number, y0: number, y1: number, k: number, material: Material) {
+        this.x0 = x0;
+        this.x1 = x1;
+        this.y0 = y0;
+        this.y1 = y1;
+        this.z = k;
+        this.material = material;
+    }
+
+    intersectsWith(ray: Ray, minDistance: number, maxDistance: number, hit: Hit): boolean {
+        const t = (this.z - ray.origin.z) / ray.direction.z;
+        if (t < minDistance || t > maxDistance) {
+            return false;
+        }
+        
+        const x = ray.origin.x + t*ray.direction.x;
+        const y = ray.origin.y + t*ray.direction.y;
+        if (x < this.x0 || x > this.x1 || y < this.y0 || y > this.y1) {
+            return false;
+        }
+        
+        hit.distance = t;
+        hit.normal = new Vector3(0, 0, this.z > 0 ? -1 : 1);
+        hit.material = this.material;
+        hit.point = Ray.finalPoint(ray.origin, ray.direction, t);
+
+        return true;
+    }
+}
+
+
+export class XZRectangle {
+    x0: number;
+    x1: number;
+    z0: number;
+    z1: number;
+    y: number;
+    material: Material;
+
+    constructor(x0: number, x1: number, z0: number, z1: number, y: number, material: Material) {
+        this.x0 = x0;
+        this.x1 = x1;
+        this.z0 = z0;
+        this.z1 = z1;
+        this.y = y;
+        this.material = material;
+    }
+
+    intersectsWith(ray: Ray, minDistance: number, maxDistance: number, hit: Hit): boolean {
+        const t = (this.y - ray.origin.y) / ray.direction.y;
+        if (t < minDistance || t > maxDistance) {
+            return false;
+        }
+
+        const x = ray.origin.x + t * ray.direction.x;
+        const z = ray.origin.z + t * ray.direction.z;
+
+        if (x < this.x0 || x > this.x1 || z < this.z0 || z > this.z1) {
+            return false;
+        }
+        
+        hit.distance = t;
+        hit.normal = new Vector3(0, this.y > 0 ? -1 : 1, 0);
+        hit.material = this.material;
+        hit.point = Ray.finalPoint(ray.origin, ray.direction, t);
+        return true;
+    }
+}
+
+
+export class YZRectangle {
+    z0: number;
+    z1: number;
+    y0: number;
+    y1: number;
+    x: number;
+    material: Material;
+
+    constructor(y0: number, y1: number, z0: number, z1: number, x: number, material: Material) {
+        this.y0 = y0;
+        this.y1 = y1;
+        this.z0 = z0;
+        this.z1 = z1;
+        this.x = x;
+        this.material = material;
+    }
+
+    intersectsWith(ray: Ray, minDistance: number, maxDistance: number, hit: Hit): boolean {
+        const t = (this.x - ray.origin.x) / ray.direction.x;
+        if (t < minDistance || t > maxDistance) {
+            return false;
+        }
+
+        const y = ray.origin.y + t * ray.direction.y;
+        const z = ray.origin.z + t * ray.direction.z;
+        if (y < this.y0 || y > this.y1 || z < this.z0 || z > this.z1) {
+            return false;
+        }
+
+        hit.distance = t;
+        hit.normal = new Vector3(this.x > 0 ? -1 : 1, 0, 0);
+        hit.material = this.material;
+        hit.point = Ray.finalPoint(ray.origin, ray.direction, t);
+        return true;
+    }
+}

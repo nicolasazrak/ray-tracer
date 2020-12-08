@@ -1,17 +1,29 @@
-import { Ray, Vector3 } from "./algebra";
+import { Point3, Ray, Vector3 } from "./algebra";
 import { Color } from "./color";
 import { Hit } from "./hit"
 
 export interface Material {
     scatter(ray: Ray, hit: Hit, attenuation: Color, scattered: Ray): boolean;
+    emmited(): Color;
+    reflected(): number;
 }
 
 
 export class Lamberian {
     color: Color;
+    refraction: number;
 
     constructor(color: Color) {
         this.color = color;
+        this.refraction = (Math.min(color.red, 1) + Math.min(color.blue, 1) + Math.min(color.green, 1)) / 6;
+    }
+
+    emmited(): Color {
+        return new Color(0, 0, 0);
+    }
+
+    reflected() {
+        return this.refraction;
     }
 
     scatter(ray: Ray, hit: Hit, attenuation: Color, scattered: Ray): boolean {
@@ -35,6 +47,14 @@ export class Metal {
         return Vector3.fromToNormalized(s, v);
     }
 
+    emmited(): Color {
+        return new Color(0, 0, 0);
+    }
+
+    reflected() {
+        return 0.9;
+    }
+
     scatter(ray: Ray, hit: Hit, attenuation: Color, scattered: Ray): boolean {
         const reflected = this.reflect(ray.direction, hit.normal);
         scattered.origin = hit.point;
@@ -52,8 +72,18 @@ export class Light {
         this.color = color;
     }
 
+    emmited(): Color {
+        return this.color.clone();
+    }
+
+    reflected(): number {
+        return 1;
+    }
+
     scatter(ray: Ray, hit: Hit, attenuation: Color, scattered: Ray): boolean {
         attenuation.set(this.color);
-        return false;
+        scattered.origin = hit.point;
+        scattered.direction = Vector3.randomAlterate(hit.normal); 
+        return true;
     }
 }
