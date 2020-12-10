@@ -30,7 +30,7 @@ func newScene(width int, height int, samplesPerPixel int) *Scene {
 		aspectRatio:     float64(width) / float64(height),
 		samplesPerPixel: samplesPerPixel,
 		fovAdjustment:   math.Pi / 4,
-		cameraPosition:  Point3{0, 1, 10},
+		cameraPosition:  Point3{0, 1, 8},
 	}
 
 	upLeft := image.Point{0, 0}
